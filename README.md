@@ -59,7 +59,7 @@ pharmacy_bot/
 | OS | Ubuntu 20.04 + JetPack 5.1 |
 | 中间件 | ROS Noetic + MoveIt |
 | 语音 | 科大讯飞离线ASR (xf_mic_asr_offline) |
-| AI推理 | Ollama + Qwen2.5/DeepSeek-Coder + RAG |
+| AI推理 | DeepSeek/Qwen API + RAG (云端) |
 | 视觉 | YOLOv8 TensorRT + PaddleOCR + pyzbar |
 | 控制 | STM32 + JetArm 6-DOF 机械臂 |
 | 管理 | Flutter Web 管理后台 |
