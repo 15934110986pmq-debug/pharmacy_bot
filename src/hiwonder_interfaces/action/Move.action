@@ -1,0 +1,5 @@
+hiwonder_interfaces/Grasp grasp
+---
+hiwonder_interfaces/GraspState result
+---
+float64 percent

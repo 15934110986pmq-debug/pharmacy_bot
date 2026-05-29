@@ -1,0 +1,7 @@
+<launch>
+        <arg name="source_image_topic" default="/rgbd_cam/color/image_rect_color" />
+        <arg name="camera_info_topic" default="/rgbd_cam/color/camera_info" />
+
+        <node name="shape_recognition" pkg="jetarm_6dof_app" type="shape_recognition.py" output="screen" respawn="true">
+        </node>
+</launch>

@@ -1,0 +1,14 @@
+<!-- -*- mode: XML -*- -->
+<launch>
+  <arg name="source_image_topic" default="/camera/image_rect_color" />
+
+  <node name="lab_config_manager" pkg="lab_config" type="lab_config_manager.py" required="true" output="screen">
+        <param name="config_file_path" value="$(find lab_config)/config/lab_config.yaml" />
+        <param name="source_image_topic" value="$(arg source_image_topic)" />
+        <rosparam>
+            kernel_erode: 5
+            kernel_dilate: 5
+        </rosparam>
+    </node>
+
+</launch>

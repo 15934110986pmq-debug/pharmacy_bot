@@ -1,0 +1,15 @@
+ROS1
+
+#关闭自启(在Docker终端中)
+~/.stop_ros.sh
+
+#启动自启(在Jetson系统终端中)
+sudo systemctl restart start_app_node.service
+
+#启动舵机控制节点
+roslaunch jetarm_sdk sdk_node_6dof.launch
+
+#启动LED控制节点
+roslaunch jetarm_sdk sdk_node_6dof.launch
+
+#

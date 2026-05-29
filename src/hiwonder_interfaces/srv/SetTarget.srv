@@ -1,0 +1,6 @@
+# 颜色标签，如'red', 'green', 'blue'
+# 垃圾类别，如'BananaPeel'
+string label
+---
+bool success
+string message

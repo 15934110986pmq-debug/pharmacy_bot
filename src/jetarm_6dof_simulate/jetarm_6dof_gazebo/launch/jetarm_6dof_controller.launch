@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+    <!-- Load joint controller configuration file -->
+    <rosparam file="$(find jetarm_6dof_gazebo)/config/jetarm_6dof_controller.yaml" command="load"/>
+
+    <!-- Load the controllers -->
+    <node name="controller_spawner" pkg="controller_manager" type="spawner" respawn="false"
+          ns="jetarm"
+          output="screen"
+          args="joint_state_controller
+                joint1_position_controller
+                joint2_position_controller
+                joint3_position_controller
+                joint4_position_controller
+                joint5_position_controller
+                r_joint_position_controller
+                "
+    />
+
+    <!-- Convert joint states to TF transforms -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"
+          respawn="false" output="screen">
+        <remap from="/joint_states" to="/jetarm/joint_states"/>
+    </node>
+</launch>

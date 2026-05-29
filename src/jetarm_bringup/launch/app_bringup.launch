@@ -1,0 +1,90 @@
+<launch>
+    <arg name="robot_name" default="$(env ROBOT_NAME)" />
+    <arg name="robot_dof" default="6" />
+    <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)"/>
+
+    <arg name="enable_calibration" default="true" />
+    <arg name="enable_finger_trace" default="true" />
+    <arg name="enable_object_sortting" default="true" />
+    <arg name="enable_object_tracking" default="true" />
+    <arg name="enable_tag_stackup" default="true" />
+    <arg name="enable_waste_classification" default="true" />
+    <arg name="enable_shape_recognition" default="true" />
+
+    <!-- 根据使用的相机设置相应参数(set corresponding parameter based on camera) -->
+    <arg name="source_image_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/camera_info" />
+    <arg name="source_image_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/camera_info" />
+
+
+    <!-- 基础功能(basic function) -->
+    <include file="$(find jetarm_bringup)/launch/base.launch">
+        <arg name="robot_dof" value="$(arg robot_dof)" />
+        <arg name="enable_kinematics" value="true"/>
+        <arg name="enable_rosbridge" value="true"/>
+        <arg name="enable_camera" value="true"/>
+        <arg name="enable_web_video" value="true"/>
+        <arg name="enable_lab_config" value="true"/>
+    </include>
+
+
+    <!-- 位置校准(position calibration) -->
+    <group if="$(arg enable_calibration)">
+        <include file="$(find jetarm_6dof_app)/launch/calibration.launch">
+            <arg name="source_image_topic" value="$(arg source_image_topic)" />
+            <arg name="camera_info_topic" value="$(arg camera_info_topic)" />
+            <arg name="camera_type" value="$(arg camera_type)" />
+        </include>
+    </group>
+
+
+    <!-- 物品分拣(object sorting) -->
+    <group if="$(arg enable_object_sortting)">
+        <include file="$(find jetarm_6dof_app)/launch/object_sortting.launch">
+            <arg name="source_image_topic" value="$(arg source_image_topic)" />
+            <arg name="camera_info_topic" value="$(arg camera_info_topic)" />
+        </include>
+    </group>
+
+    <!-- 指尖轨迹(fingertip trajectory) -->
+    <group if="$(arg enable_finger_trace)">
+        <include file="$(find jetarm_6dof_app)/launch/finger_trace.launch">
+            <arg name="source_image_topic" value="$(arg source_image_topic)" />
+        </include>
+    </group>
+
+    <!-- 目标追踪(object tracking) -->
+    <group if="$(arg enable_object_tracking)">
+        <include file="$(find jetarm_6dof_app)/launch/object_tracking.launch">
+            <arg name="source_image_topic" value="$(arg source_image_topic)" />
+            <arg name="camera_info_topic" value="$(arg camera_info_topic)" />
+        </include>
+    </group>
+
+    <!-- 垃圾分类(garbage classification) -->
+    <group if="$(arg enable_waste_classification)">
+        <include file="$(find jetarm_6dof_app)/launch/waste_classification.launch">
+            <arg name="source_image_topic" value="$(arg source_image_topic)" />
+            <arg name="camera_info_topic" value="$(arg camera_info_topic)" />
+        </include>
+    </group>
+
+    <!-- 智能码垛(intelligent stacking) -->
+    <group if="$(arg enable_tag_stackup)">
+        <include file="$(find jetarm_6dof_app)/launch/tag_stackup.launch">
+            <arg name="source_image_topic" value="$(arg source_image_topic)" />
+            <arg name="camera_info_topic" value="$(arg camera_info_topic)" />
+        </include>
+    </group>
+
+    <!-- 形状分拣(shape sorting) -->
+    <group if="$(arg enable_shape_recognition)">
+    	<group unless="$(eval camera_type=='USB_CAM')">
+        	<include file="$(find jetarm_6dof_app)/launch/shape_recognition.launch">
+        	</include>
+	</group>
+    </group>
+
+    <node name="bringup_notify" pkg="jetarm_bringup" type="bringup_notify.py" /> 
+</launch>

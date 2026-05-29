@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<!--颜色识别(color recognition)-->
+<launch>
+    <arg name="node_name"       default="color_detection"/>
+    <arg name="debug"           default="false"/>
+    <arg name="enable_display"  default="false"/>
+    <arg name="distance"        default="20"/>
+    <arg name="camera_name"     default="camera"/>
+    <arg name="image_topic"     default="image_rect_color"/>
+    <arg name="source_image_topic" default="/rgbd_cam/color/image_rect_color" />
+
+    <!--要识别的颜色列表，注意需要在config.yaml里有才行(List of colors to be recognized, please note that they need to be in the config.yaml)-->
+    <rosparam param="/$(arg node_name)/color_list">["red", "green", "blue"]</rosparam>
+    <rosparam file="$(find color_detection)/config/config.yaml" command="load" ns="config"/>
+
+    <node pkg="color_detection" type="color_detection_node.py" name="$(arg node_name)" output="screen">
+        <!-- 相机节点 (camera node)-->
+        <param name="source_image_topic" value="$(arg source_image_topic)" />
+        <!--物体移动的欧式距离(像素)小于此值判定为是同一个物体(objects are considered the same if the Euclidean distance (in pixels) they move is less than this value)-->
+        <param name="distance"          value="$(arg distance)"/>
+        <!--直接开启识别颜色(start directly color recognition)-->
+        <param name="debug"             value="$(arg debug)"/>
+        <!--显示画面(display image)-->
+        <param name="enable_display"    value="$(arg enable_display)"/>
+    </node>
+</launch>

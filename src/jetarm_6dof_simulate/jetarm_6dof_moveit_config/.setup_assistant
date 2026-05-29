@@ -1,0 +1,11 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: jetarm_6dof_description
+    relative_path: urdf/jetarm_6dof_robot.urdf.xacro
+    xacro_args: ""
+  SRDF:
+    relative_path: config/jetarm_6dof.srdf
+  CONFIG:
+    author_name: LuYongping
+    author_email: support@hiwonder.com
+    generated_timestamp: 1679843868

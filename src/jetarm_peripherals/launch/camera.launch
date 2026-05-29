@@ -1,0 +1,53 @@
+<launch>
+  <arg name="camera_type" default="$(optenv CAMERA_TYPE USB_CAM)"/>
+  <arg name="tf_prefix" default="" />
+  <arg name="enable_lab_config" default="false" />
+  <arg name="enable_web_video" default="false" />
+
+  <!-- 相机型号(camera type) -->
+  <arg name="camera_name" if="$(eval camera_type=='USB_CAM')" default="usb_cam" />
+  <arg name="camera_name" if="$(eval camera_type=='GEMINI')" default="rgbd_cam" />
+
+  <arg name="source_image_topic" default="/$(arg camera_name)/image_rect_color" if="$(eval camera_type=='USB_CAM')" />
+  <arg name="source_image_topic" default="/$(arg camera_name)/color/image_rect_color" if="$(eval camera_type=='GEMINI')" />
+
+  <param name="camera_type" value="$(arg camera_type)" />
+  <param name="camera_name" value="$(arg camera_name)" />
+
+  <!-- 使用 USB 相机(use USB camera) -->
+  <param name="camera_rgb_raw" value="$(arg camera_name)/image_raw" if="$(eval camera_type=='USB_CAM')" />
+  <param name="camera_rgb_rect" value="$(arg camera_name)/image_rect_color" if="$(eval camera_type=='USB_CAM')" />
+  <param name="camera_rgb_info" value="$(arg camera_name)/camera_info" if="$(eval camera_type=='USB_CAM')" />
+  <group if="$(eval arg('camera_type')=='USB_CAM')">
+    <include file="$(find jetarm_peripherals)/launch/usb_cam.launch">
+      <arg name="camera_name" value="$(arg camera_name)" />
+      <arg name="tf_prefix" value="$(arg tf_prefix)" />
+    </include>
+  </group>
+
+  <!-- GEMINI 深度相机(GEMINI depth camera) -->
+  <param name="camera_rgb_raw" value="$(arg camera_name)/color/image_raw" if="$(eval camera_type=='GEMINI')" />
+  <param name="camera_rgb_rect" value="$(arg camera_name)/color/image_rect_color" if="$(eval camera_type=='GEMINI')" />
+  <param name="camera_rgb_info" value="$(arg camera_name)/color/camera_info" if="$(eval camera_type=='GEMINI')" />
+  <group if="$(eval arg('camera_type')=='GEMINI')">
+    <include file="$(find astra_camera)/launch/gemini.launch">
+      <arg name="camera_name" value="$(arg camera_name)" />
+    </include>
+    <node name="image_proc" pkg="image_proc" type="image_proc" ns="$(arg camera_name)/color" />
+  </group>
+
+
+  <!-- web video server -->
+  <group if="$(arg enable_web_video)">
+    <include file="$(find jetarm_bringup)/launch/web_video_server.launch" />
+  </group>
+
+
+  <!-- lab config -->
+  <group if="$(arg enable_lab_config)">
+    <include file="$(find lab_config)/launch/lab_config_manager.launch">
+      <arg name="source_image_topic" value="$(arg source_image_topic)" />
+    </include>
+  </group>
+
+</launch>

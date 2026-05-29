@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<launch>
+  <arg name="robot_name" default="$(optenv ROBOT_NAME JetArm)" />
+  <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)" />
+  <arg name="robot_dof" default="$(optenv ROBOT_DOF 6)" />
+  <arg name="use_sim" default="false" />
+
+  <arg name="enable_grasp" default="true" />
+  <arg name="enable_kinematics" default="true" />
+  <arg name="enable_rosbridge" default="true" />
+
+  <!-- 是否开启手柄控制(whether to joystick control enabled) -->
+  <arg name="enable_joystick" default="true" />  
+
+  <!-- 相机相关(camera related) -->
+  <arg name="enable_camera" default="true" />
+  <arg name="enable_web_video" default="true" />
+  <arg name="enable_lab_config" default="true" />
+
+  <include file="$(find jetarm_sdk)/launch/sdk_node_6dof.launch">
+    <arg name="use_sim" value="$(arg use_sim)" />
+  </include>
+
+  <include file="$(find jetarm_6dof_description)/launch/description.launch">
+      <arg name="camera_type" value="$(arg camera_type)" />
+  </include>
+
+  <rosparam file="$(find color_detection)/config/config.yaml" command="load" ns="config"/>
+  <group if="$(eval arg('camera_type')=='USB_CAM')">
+	 <rosparam file="$(find color_detection)/config/usb_cam_config.yaml" command="load" ns="config"/>
+  </group>
+
+
+  <rosparam file="$(find jetarm_bringup)/config/positions.yaml" command="load" ns="positions"/>
+
+  <!-- 相机及阈值(camera and threshold)-->
+  <group if="$(arg enable_camera)">
+    <include file="$(find jetarm_peripherals)/launch/camera.launch">
+      <arg name="enable_web_video" value="true" />
+      <arg name="enable_lab_config" value="true" />
+    </include>
+  </group>
+
+  <group if="$(arg enable_kinematics)">
+    <include file="$(find jetarm_kinematics)/launch/kinematics_node_6dof.launch">
+    </include>
+  </group>
+
+  <group if="$(arg enable_grasp)" >
+    <include file="$(find hiwonder_grasp)/launch/grasp_node.launch" >
+    </include>
+  </group>
+
+  <group if="$(arg enable_rosbridge)">
+    <include file="$(find jetarm_bringup)/launch/rosbridge.launch" />
+  </group>
+
+  <!-- 手柄控制(joystick control) -->
+  <group if="$(arg enable_joystick)">
+    <include file="$(find jetarm_peripherals)/launch/joystick_control.launch" />
+  </group>
+
+</launch>

@@ -1,0 +1,100 @@
+controllers:
+  joint1:
+    type: JointPositionController
+    joint_name: joint1
+    joint_speed: 1.0
+    servo:
+      type: 1
+      servo_id: 1
+      global_id: 1
+      initial_ticks: 500
+      minimum_ticks: 0
+      maximum_ticks: 1000
+      radians_per_encoder_tick: 0.00418879
+      encoder_ticks_per_radian: 238.7324146
+      encoder_resolution: 1000
+
+  joint2:
+    type: JointPositionController
+    joint_name: joint2
+    servo:
+      type: 1
+      servo_id: 2
+      global_id: 2
+      initial_ticks: 500
+      minimum_ticks: 0
+      maximum_ticks: 1000
+      radians_per_encoder_tick: 0.00418879
+      encoder_ticks_per_radian: 238.7324146
+      encoder_resolution: 1000
+
+  joint3:
+    type: JointPositionController
+    joint_name: joint3
+    servo:
+      type: 1
+      servo_id: 3
+      global_id: 3
+      initial_ticks: 500
+      minimum_ticks: 0
+      maximum_ticks: 1000
+      radians_per_encoder_tick: 0.00418879
+      encoder_ticks_per_radian: 238.7324146
+      encoder_resolution: 1000
+
+  joint4:
+    type: JointPositionController
+    joint_name: joint4
+    servo:
+      type: 1
+      servo_id: 4
+      global_id: 4
+      initial_ticks: 500
+      minimum_ticks: 0
+      maximum_ticks: 1000
+      radians_per_encoder_tick: 0.00418879
+      encoder_ticks_per_radian: 238.7324146
+      encoder_resolution: 1000
+
+  joint5:
+    type: JointPositionController
+    joint_name: joint5
+    servo:
+      type: 1
+      servo_id: 5
+      global_id: 5
+      initial_ticks: 500
+      minimum_ticks: 0
+      maximum_ticks: 1000
+      radians_per_encoder_tick: 0.00418879
+      encoder_ticks_per_radian: 238.7324146
+      encoder_resolution: 1000
+
+  joint6:
+    type: JointPositionController
+    joint_name: joint5
+    servo:
+      type: 1
+      servo_id: 6
+      global_id: 6
+      initial_ticks: 500
+      maximum_ticks: 1000 
+      minimum_ticks: 0
+      radians_per_encoder_tick: 0.00418879
+      encoder_ticks_per_radian: 238.7324146
+      encoder_resolution: 1000
+
+  r_joint:
+    type: JointPositionController
+    joint_name: r_joint
+    servo:
+      type: 1
+      servo_id: 10
+      global_id: 10
+      initial_ticks: 700
+      maximum_ticks: 200
+      minimum_ticks: 700
+      radians_per_encoder_tick: 0.003141592
+      encoder_ticks_per_radian: 318.3098862
+      encoder_resolution: 1000
+

@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+    <!-- 设置节点名 -->
+    <arg name="node_name"       default="positioning_clamp"/>
+    <arg name="color" default="red" />
+    <!-- 选择对应的相机类型 -->
+    <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)"/>
+    <!-- 根据使用的相机设置相应参数 -->
+    <arg name="source_image_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/camera_info" />
+    <arg name="source_image_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/camera_info" />
+    <!-- 基础功能 -->
+    <!--舵机控制节点-->
+    <include file="$(find jetarm_bringup)/launch/base.launch"/>
+    <node pkg="jetarm_example" type="positioning_clamp.py" name="$(arg node_name)" output="screen">
+        <param name="source_image_topic" value="$(arg source_image_topic)" />
+        <param name="camera_info_topic" value="$(arg camera_info_topic)" />
+        <param name="color" value="$(arg color)"/>
+
+    </node>
+</launch>

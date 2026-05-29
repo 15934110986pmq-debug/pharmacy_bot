@@ -1,0 +1,4 @@
+<launch>
+    <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)"  />
+    <param name="extrinsics" type="yaml" command="cat $(find jetarm_peripherals)/config/extrinsics_$(arg camera_type).yaml" />
+</launch>

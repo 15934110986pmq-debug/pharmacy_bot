@@ -1,0 +1,6 @@
+<launch>
+  <!-- web video 流(web video stream) -->
+  <node name="web_video_server" pkg="web_video_server" type="web_video_server">
+    <param name="type" value="h264" />
+  </node>
+</launch>

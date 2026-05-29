@@ -1,0 +1,15 @@
+<launch>
+	<arg name="camera_name" default="rgbd_cam" />
+	<arg name="image_topic" default="color/image_raw" />
+
+	<param name="camera/camera_name" value="$(arg camera_name)"/>
+	<param name="camera/image_topic" value="$(arg image_topic)"/>
+
+    	<!-- 启动apriltag检测节点(start apriltag detection node) -->
+ 	<include file="$(find apriltag_ros)/launch/continuous_detection.launch" >
+		<arg name="camera_name" value="/$(arg camera_name)" />
+		<arg name="camera_frame" value="$(arg camera_name)" />
+		<arg name="image_topic" value="$(arg image_topic)" />
+	</include>
+
+</launch>

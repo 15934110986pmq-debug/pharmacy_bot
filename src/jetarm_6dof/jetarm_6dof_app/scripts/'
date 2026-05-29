@@ -1,0 +1,421 @@
+#!/usr/bin/python3
+#coding=utf8
+
+# 通过深度图识别物体的外形进行分类(use depth image to recognize the shape of objects for classification)
+# 机械臂向下识别(recognition downwards with the robotic arm)
+# 可以识别长方体，球，圆柱体(capable of recognizing cuboids, spheres, and cylinders)
+
+
+import cv2
+import rospy
+import numpy as np
+import message_filters
+from sensor_msgs.msg import Image as RosImage, CameraInfo
+from std_srvs.srv import SetBool
+from vision_utils import fps
+import threading
+import queue
+from hiwonder_interfaces.msg import MoveAction, MoveGoal, MultiRawIdPosDur
+from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
+from std_srvs.srv import SetBool, SetBoolRequest, SetBoolResponse
+from vision_utils import xyz_quat_to_mat, xyz_euler_to_mat, mat_to_xyz_euler
+from jetarm_sdk import pid, bus_servo_control, sdk_client, tone
+from jetarm_sdk.servo_controller import controller as actiongroup
+from jetarm_kinematics import kinematics_control
+from utils import unregister
+import heart
+from math import radians
+from hiwonder_interfaces.srv import SetInt8, SetInt8Request, SetInt8Response
+from hiwonder_interfaces.msg import MultiRawIdPosDur
+from jetarm_sdk import bus_servo_control
+import os
+import actionlib
+from actionlib_msgs.msg import GoalID
+
+CONFIG_NAME = "/config"
+
+TARGET_POSITION = {
+    "sphere": [0.07, 0.235, 0.08],
+    "cylinder": [0.0, 0.235, 0.08],
+    "cuboid": [-0.07, 0.235, 0.08],
+}
+
+
+def depth_pixel_to_camera(pixel_coords, depth, intrinsics):
+    fx, fy, cx, cy = intrinsics
+    px, py = pixel_coords
+    x = (px - cx) * depth / fx
+    y = (py - cy) * depth / fy
+    z = depth
+    return np.array([x, y, z])
+
+class RgbDepthImageNode:
+    def __init__(self):
+        rospy.init_node('shape_recognition', anonymous=True)
+        self.fps = fps.FPS()
+        self.last_shape = "none"
+        self.moving = False
+        self.stop = False
+        self.count = 0
+        self.endpoint = None
+        self.entered = False
+        self.is_running = False
+        self.rgb_or_depth = True
+        self.lock = threading.RLock()
+        self.subs = []
+        self.shape = 'none'
+        self.moving_step = 0
+        self.status = 1
+
+        self.queue = queue.Queue(maxsize=1)
+        self.sdk = sdk_client.JetArmSDKClient()
+        config = rospy.get_param(CONFIG_NAME)
+        self.hand2cam_tf_matrix = config['hand2cam_tf_matrix']
+
+        self.servos_pub = rospy.Publisher('/controllers/multi_id_pos_dur', MultiRawIdPosDur, queue_size=1)
+        rospy.sleep(3)
+        rospy.wait_for_service('/kinematics/set_joint_value_target')
+        rospy.wait_for_service('/rgbd_cam/set_ldp')
+        rospy.ServiceProxy('/rgbd_cam/set_ldp', SetBool)(False)
+        
+        self.result_image_pub = rospy.Publisher('~image_result', RosImage, queue_size=10)
+        self.set_running_srv = rospy.Service('~set_running', SetBool, self.set_running_srv_callback)
+        self.set_rgb_or_depth_srv = rospy.Service('~rgb_or_depth', SetBool, self.set_rgb_or_depth_srv_callback)
+        self.heart = heart.Heart('~heartbeat', 5, lambda e: self.exit_srv_callback(e))
+        self.exit_srv = rospy.Service('~exit', Trigger, self.exit_srv_callback)
+        self.enter_srv = rospy.Service('~enter', Trigger, self.enter_srv_callback
+                                       )
+        self.action_client = actionlib.SimpleActionClient('/grasp', MoveAction)
+        self.cancel_pub = rospy.Publisher('/grasp/cancel', GoalID, queue_size=10)
+        self.goal_id = GoalID()
+
+    def enter_srv_callback(self, _: TriggerRequest):
+        # 获取和发布图像的topic(get and publish the topic of image)
+        with self.lock:
+            if not self.entered:
+                rospy.loginfo("加载玩法")
+                self.goto_default()
+                self.stop = False
+                self.entered = True
+                self.rgb_or_depth = True
+                self.is_running = False
+                rgb_sub = message_filters.Subscriber('/rgbd_cam/color/image_raw', RosImage, queue_size=1)
+                depth_sub = message_filters.Subscriber('/rgbd_cam/depth/image_raw', RosImage, queue_size=1)
+                info_sub = message_filters.Subscriber('/rgbd_cam/depth/camera_info', CameraInfo, queue_size=1)
+                self.subs = [rgb_sub, depth_sub, info_sub]
+                sync = message_filters.ApproximateTimeSynchronizer(self.subs, 3, 0.03)  # 同步时间戳, 时间允许有误差在0.03s(synchronize timestamps, allowing for a time error of up to 0.03 seconds)
+                rospy.sleep(2)
+                sync.registerCallback(self.multi_callback) #执行反馈函数(perform feedback function)
+        return TriggerResponse(success=True)
+    
+    def exit_srv_callback(self, _: TriggerRequest):
+        rospy.loginfo("卸载玩法")
+        self.cancel_pub.publish(self.goal_id)
+        with self.lock:
+            if self.entered:
+                self.is_running = False
+                for sub in self.subs:
+                    unregister(sub)
+                self.entered = False
+        return TriggerResponse(success=True)
+    
+    def set_running_srv_callback(self, msg):
+        with self.lock:
+            self.is_running = msg.data
+            self.cancel_pub.publish(self.goal_id)
+            rospy.loginfo("Sent cancel request")
+
+    def set_rgb_or_depth_srv_callback(self, msg):
+        rospy.loginfo("Set RGB or DEPTH")
+        with self.lock:
+            self.rgb_or_depth = msg.data
+        
+    
+    def goto_default(self):
+        endpoint = kinematics_control.set_joint_value_target([500, 540, 220, 50, 500])
+        pose_t = endpoint.pose.position
+        pose_r = endpoint.pose.orientation
+        # bus_servo_control.set_servos(self.servos_pub, 1000, ((1, 500),))
+        # rospy.sleep(1)
+        bus_servo_control.set_servos(self.servos_pub, 1000, ((2, 540), (3, 220), (4, 50), (5, 500),))
+        rospy.sleep(1)
+        bus_servo_control.set_servos(self.servos_pub, 1000, ((1, 500),))
+        rospy.sleep(1)
+        self.endpoint = xyz_quat_to_mat([pose_t.x, pose_t.y, pose_t.z], [pose_r.w, pose_r.x, pose_r.y, pose_r.z])
+
+
+    def done_callback(self, state, result):  # 动作执行完毕回调(callback function when the action is completed)
+        rospy.loginfo("state:%f", state)
+        if not result.result.complete:  # 如果在移动中被取消，需要回到初始位置(if canceled while in motion, return to the initial position)
+            bus_servo_control.set_servos(self.servos_pub, 800, ( (2, 560), (3, 130), (4, 115), (5, 500), (10, 200)))
+            rospy.sleep(1)
+            bus_servo_control.set_servos(self.servos_pub, 800, ((1, 500), ))
+            rospy.sleep(0.8)
+            bus_servo_control.set_servos(self.servos_pub, 500, ((10, 200), ))
+            rospy.sleep(0.5)
+            self.moving = False
+
+
+        elif self.moving_step != 1:
+            bus_servo_control.set_servos(self.servos_pub, 500, ((10, 200), ))
+
+        if self.finish_percent == 1:  # 如果完整的完成移动(if the motion is completed in full)
+            if self.moving_step == 1:  # 如果完成了夹取(if the grasping is completed)
+                self.moving_step = 2
+                self.status = 2
+            
+            elif self.moving_step == 2:  # 如果完成了放置(if the placement is completed)
+                # actions.go_home(self.servos_pub)
+                self.goto_default()
+                rospy.sleep(0.5)
+                self.last_position = None
+                self.target = None
+                self.count = 0
+                self.moving_step = 0
+                self.moving = False
+        else:  # 如果被取消或者无法到达指定位置(if canceled or unable to reach the specified position)
+            self.status = 0
+            # actions.go_home(self.servos_pub)
+            self.goto_default()
+            self.moving_step = 0
+            self.last_position = None
+
+    def active_callback(self):  # 运动开始回调(callback function when the motion starts)
+        self.start_move = True
+        rospy.loginfo("start move")
+
+    def feedback_callback(self, msg):  # 动作执行进度回调(progress callback during action execution)
+        rospy.loginfo("finish action: {:.2%}".format(msg.percent))
+        self.finish_percent = msg.percent
+
+    def place(self):
+        goal = MoveGoal()
+        rospy.sleep(1)
+        goal.grasp.mode = 'place'
+        #print("self.shape: ", self.shape)
+        goal.grasp.position.x = TARGET_POSITION[self.shape][0]
+        goal.grasp.position.y = TARGET_POSITION[self.shape][1] 
+        goal.grasp.position.z = TARGET_POSITION[self.shape][2]
+        goal.grasp.pitch = 60
+        goal.grasp.align_angle = -90  # yaw #- 20/1000* 240
+        goal.grasp.grasp_approach.z = 0.05  # 放置时靠近的方向和距离(direction and distance of approach during placement)
+        goal.grasp.grasp_retreat.z = 0.05  # 放置后后撤的方向和距离(direction and distance of retreat after placement)
+        goal.grasp.grasp_posture = 370  # 夹取前后夹持器的开合角度(the opening and closing angle of the grippers before and after grasping)
+        goal.grasp.pre_grasp_posture = 580
+        self.action_client.send_goal(goal, self.done_callback, self.active_callback, self.feedback_callback)
+
+    def start_moving(self, pose_t, angle):
+        rospy.loginfo("开始搬运堆叠...")
+        
+        self.moving_step = 1
+        goal = MoveGoal()
+        goal.grasp.mode = 'pick'
+        if angle != 0:
+                angle = angle % 180
+                angle = angle - 180 if angle > 90 else (angle + 180 if angle < -90 else angle)
+                # angle = 500 + int(1000 * (angle + ret2[3][-1]) / 240)
+        else:
+            angle = 90
+        # angle = angle - 90 if angle > 45 else (r + 90 if r < -45 else r)
+        # 物体坐标(object coordinates)
+        goal.grasp.position.x = pose_t[0]
+        goal.grasp.position.y = pose_t[1]+0.035
+        goal.grasp.position.z = pose_t[2]-0.025
+        # 夹取时的姿态角(posture angle during grasping)
+        goal.grasp.pitch = 80
+        goal.grasp.align_angle = angle  # 总是朝前(always move forward)
+        # 夹取时靠近的方向和距离(direction and distance of approach during grasping)
+        goal.grasp.grasp_approach.z = 0.03
+        # 夹取后后撤方向和距离(direction and distance of retreat after grasping)
+        goal.grasp.grasp_retreat.z = 0.05
+        # 夹取前后夹持器的开合(the opening and closing angle of the grippers before and after grasping)
+        goal.grasp.grasp_posture = 580
+        goal.grasp.pre_grasp_posture = 220
+        self.action_client.send_goal(goal, self.done_callback, self.active_callback, self.feedback_callback)  # 发送夹取请求(send grasping requirement)
+
+    def action_starting(self, pose_t, pose_R):
+        while True:
+            if self.status == 1:
+                self.status = 0
+                self.start_moving(pose_t,pose_R)
+            elif self.status == 2:
+                self.status = 0
+                self.place()
+            else:
+                rospy.sleep(0.01)
+  
+
+    def multi_callback(self, ros_rgb_image, ros_depth_image, depth_camera_info):
+        #rospy.loginfo("recv image")
+        if self.queue.empty():
+            self.queue.put_nowait((ros_rgb_image, ros_depth_image, depth_camera_info))
+
+
+    def image_proc(self):
+        ros_rgb_image, ros_depth_image, depth_camera_info = self.queue.get(block=True)
+        try:
+            rgb_image = np.ndarray(shape=(ros_rgb_image.height, ros_rgb_image.width, 3), dtype=np.uint8, buffer=ros_rgb_image.data)
+            depth_image = np.ndarray(shape=(ros_depth_image.height, ros_depth_image.width), dtype=np.uint16, buffer=ros_depth_image.data)
+
+            ih, iw = depth_image.shape[:2]
+
+            depth_image = depth_image.copy()
+            depth_image[:, :100] = np.array([[1000,]*100]* 400)
+            depth_image[:, 540:] = np.array([[1000,]*100]* 400)
+            depth_image[350:400, :] = np.array([[1000,]*640]* 50)
+            depth_image[0:50, :] = np.array([[1000,]*640]* 50)
+            depth = np.copy(depth_image).reshape((-1, ))
+            depth[depth<=0] = 55555
+            min_index = np.argmin(depth)
+            min_y = min_index // iw
+            min_x = min_index - min_y * iw
+
+            min_dist = depth_image[min_y, min_x]
+            sim_depth_image = np.clip(depth_image, 0, 2000).astype(np.float64) / 2000 * 255
+            
+            depth_image = np.where(depth_image > 220, 0, depth_image)
+            depth_image = np.where(depth_image > min_dist + 30, 0, depth_image)
+            sim_depth_image_sort = np.clip(depth_image, 0, 2000).astype(np.float64) / 2000 * 255
+            depth_gray = sim_depth_image_sort.astype(np.uint8)
+            depth_gray = cv2.GaussianBlur(depth_gray, (3, 3), 0)
+            _, depth_bit = cv2.threshold(depth_gray, 1, 255, cv2.THRESH_BINARY)
+            #depth_bit = cv2.erode(depth_bit, np.ones((3, 3), np.uint8))
+            #depth_bit = cv2.dilate(depth_bit, np.ones((3, 3), np.uint8))
+            depth_color_map = cv2.applyColorMap(sim_depth_image.astype(np.uint8), cv2.COLORMAP_JET)
+
+            contours, hierarchy = cv2.findContours(depth_bit, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+            shape = 'none'
+            contour = None
+            for obj in contours:
+                if min_dist > 220:
+                    break
+                area = cv2.contourArea(obj)
+                if area < 2000 or self.moving is True:
+                    continue
+                cv2.drawContours(depth_color_map, obj, -1, (255, 255, 0), 4) # 绘制轮廓线(draw contour line)
+                perimeter = cv2.arcLength(obj, True)  # 计算轮廓周长(calculate contour perimeter)
+                approx = cv2.approxPolyDP(obj, 0.035 * perimeter, True) # 获取轮廓角点坐标(get contour angle point coordinates)
+                cv2.drawContours(depth_color_map, approx, -1, (255, 0, 0), 4) # 绘制轮廓线(draw contour line)
+                CornerNum = len(approx)
+
+                x, y, w, h = cv2.boundingRect(approx)
+                contour_depth = depth_image[y + int(h / 2) - 2: y + int(h / 2) + 2, x: x + w]
+                depth  =  np.where(contour_depth == 0, np.nan, contour_depth)
+                depth_std = np.nanstd(depth)
+                # print(depth_std, CornerNum)
+                if depth_std > 1:
+                    if CornerNum > 4:
+                        objType = "sphere_1"
+                    elif CornerNum == 4:
+                        objType = "cylinder_1"
+                    else:
+                        objType = "none"
+                else:
+                    if CornerNum == 4:
+                        if min_y > (y + int(h / 10 * 7)):
+                            objType="cuboid_2"
+                        else:
+                            objType="cylinder_2"
+                    else:
+                        if  4 < CornerNum < 10:
+                            objType="cylinder_2"
+                        else:
+                            objType = "none"
+                shape=objType
+                contour = obj
+                cv2.rectangle(depth_color_map, (x, y), (x + w, y + h), (255, 255, 255), 2)
+                cv2.putText(depth_color_map, objType, (x + w // 2, y + (h //2) - 10), cv2.FONT_HERSHEY_COMPLEX, 1.0, (0, 0, 0), 2, cv2.LINE_AA)
+                cv2.putText(depth_color_map, objType, (x + w // 2, y + (h //2) - 10), cv2.FONT_HERSHEY_COMPLEX, 1.0, (255, 255, 255), 1)
+                break
+            if self.last_shape == shape and shape != 'none' and self.moving is False and self.is_running:
+                #print(self.count)
+                self.count += 1
+            else:
+                self.count = 0
+            if contour is not None:
+                (cx, cy), r = cv2.minEnclosingCircle(obj)
+                K = depth_camera_info.K
+                position = depth_pixel_to_camera((cx, cy), min_dist / 1000, (K[0], K[4], K[2], K[5]))
+                position[0] -= 0.01
+                pose_end = np.matmul(self.hand2cam_tf_matrix, xyz_euler_to_mat(position, (0, 0, 0)))
+                world_pose = np.matmul(self.endpoint, pose_end)
+                pose_t, pose_r = mat_to_xyz_euler(world_pose)
+                min_x, min_y = cx, cy
+                angle = 0
+                offset_x = 0.008
+                offset_y = 0
+                offset_z = 0.00
+                pose_t[0] += offset_x
+                pose_t[1] += offset_y
+                pose_t[2] += offset_z
+                if shape == "cylinder_1" or shape == "cuboid_2":
+                    center, (width, height), angle = cv2.minAreaRect(contour)
+                    print("angle: ", angle)
+                    if angle < 45:
+                        angle += 90
+                    # if width > height:
+                    if width > height and width / height > 1.5:
+                        print("wh: ", width, height)
+                        angle = angle + 90
+                    print("angle:2222222222222222222222222222222222222 ", angle)
+                    cv2.drawContours(depth_color_map, [np.intp(cv2.boxPoints((center, (width,height), angle)))], -1, (0, 0, 255), 2, cv2.LINE_AA)
+                if self.count > 25:
+                    self.count = 0
+                    self.moving = True
+                    self.shape = shape[:-2]
+                    self.moving_step = 1
+                    self.status = 1
+                    # threading.Thread(target=self.move, args=(shape[:-2], pose_t, angle)).start()
+                    threading.Thread(target=self.action_starting, args=( pose_t, angle)).start()
+
+            self.last_shape = shape
+
+            txt = 'Dist: {}mm'.format(min_dist)
+            if not self.moving:
+
+                cv2.circle(depth_color_map, (int(min_x), int(min_y)), 8, (32, 32, 32), -1)
+                cv2.circle(depth_color_map, (int(min_x), int(min_y)), 6, (255, 255, 255), -1)
+                cv2.putText(depth_color_map, txt, (11, ih-20), cv2.FONT_HERSHEY_PLAIN, 2.0, (32, 32, 32), 6, cv2.LINE_AA)
+                cv2.putText(depth_color_map, txt, (10, ih-20), cv2.FONT_HERSHEY_PLAIN, 2.0, (240, 240, 240), 2, cv2.LINE_AA)
+
+            bgr_image = cv2.cvtColor(rgb_image[40:440, ], cv2.COLOR_RGB2BGR)
+            if not self.moving:
+                cv2.circle(bgr_image, (int(min_x), int(min_y)), 8, (32, 32, 32), -1)
+                cv2.circle(bgr_image, (int(min_x), int(min_y)), 6, (255, 255, 255), -1)
+                cv2.putText(bgr_image, txt, (11, ih - 20), cv2.FONT_HERSHEY_PLAIN, 2.0, (32, 32, 32), 6, cv2.LINE_AA)
+                cv2.putText(bgr_image, txt, (10, ih - 20), cv2.FONT_HERSHEY_PLAIN, 2.0, (240, 240, 240), 2, cv2.LINE_AA)
+
+            result_image = None
+            if self.rgb_or_depth:
+                result_image = cv2.resize(cv2.cvtColor(bgr_image, cv2.COLOR_BGR2RGB), (640, 480))
+            else:
+                result_image = cv2.resize(cv2.cvtColor(depth_color_map, cv2.COLOR_BGR2RGB), (640, 480))
+            ros_rgb_image.data = result_image.tobytes()
+            self.result_image_pub.publish(ros_rgb_image)
+            #result_image = np.concatenate([bgr_image, depth_color_map], axis=1)
+            #if key != -1:
+            #    rospy.signal_shutdown('shutdown1')
+
+        except Exception as e:
+            rospy.logerr('callback error:', str(e))
+
+
+if __name__ == "__main__":
+    print('''
+    *********************************************
+    *                                           *
+    * 此程序需要订阅深度摄像头节点,开启前请确保(The depth camera node needs to be subscribed for this program, please ensure that before starting)*
+    * 已开启摄像头节点, 通过rostopic list可查看(the camera node has been started, which can be checked via rostopic list) *
+    * 是否有usb_cam相关节点,成功运行可看到终端(if there is usb_cam related node, the terminal can be viewed after successfully running)  *
+    * running ...                               *
+    *                                           * 
+    *********************************************
+    ''')
+
+    try:
+        node = RgbDepthImageNode()
+        while not rospy.is_shutdown():
+            node.image_proc()
+    except KeyboardInterrupt:
+        rospy.loginfo("shutdown2")
+

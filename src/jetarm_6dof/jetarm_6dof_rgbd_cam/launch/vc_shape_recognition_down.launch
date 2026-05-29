@@ -1,0 +1,6 @@
+<launch>
+        <include file="$(find jetarm_bringup)/launch/base.launch"/>
+ 
+        <node name="get_depth_rgb" pkg="jetarm_6dof_rgbd_cam" type="vc_shape_recognition_down.py" output="screen" respawn="true">
+        </node>
+</launch>

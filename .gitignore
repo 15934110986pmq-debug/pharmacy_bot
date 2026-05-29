@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# ROS
+build/
+devel/
+logs/
+*.bag
+
+# Large binary files
+*.engine
+*.jet
+*.pcm
+*.wav
+*.part*.rar
+*.exe
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Empty dirs that should be tracked
+!ai_agent/.gitkeep
+!ocr_barcode/.gitkeep
+!models/.gitkeep
+!scripts/.gitkeep
+*.tar

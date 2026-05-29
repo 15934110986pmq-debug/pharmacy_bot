@@ -1,0 +1,12 @@
+<launch>
+    <!-- 开启坐标转换节点(start coordinate transformation node)-->
+    <arg name="debug"           default="false"/>
+    <arg name="enable_display"  default="false"/>
+    <arg name="source_image_topic" default="/rgbd_cam/color/image_rect_color" />
+
+    <node name="pixel2world" pkg="hiwonder_transform" type="pixel2world_node.py" required="true" output="screen">
+        <param name="debug"             value="$(arg debug)"/>
+        <param name="enable_display"    value="$(arg enable_display)"/>
+        <param name="source_image_topic" value="$(arg source_image_topic)" />
+    </node>
+</launch>

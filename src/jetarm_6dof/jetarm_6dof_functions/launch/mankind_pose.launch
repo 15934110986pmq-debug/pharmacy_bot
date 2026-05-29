@@ -1,0 +1,16 @@
+<launch>
+    <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)"/>
+
+    <!-- 根据使用的相机设置相应参数(set corresponding parameters based on the used camera) -->
+    <arg name="source_image_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/camera_info" />
+    <arg name="source_image_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/camera_info" />
+
+        <include file="$(find jetarm_bringup)/launch/base.launch"/>
+ 
+        <node name="mankind_pose" pkg="jetarm_6dof_functions" type="mankind_pose.py" output="screen" respawn="true">
+                <param name="source_image_topic" value="$(arg source_image_topic)" />
+        </node>
+</launch>
+

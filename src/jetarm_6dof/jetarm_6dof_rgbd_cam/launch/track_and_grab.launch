@@ -1,0 +1,8 @@
+<launch>
+        <arg name="target_color" default="red" />
+        <include file="$(find jetarm_bringup)/launch/base.launch"/>
+ 
+        <node name="track_and_grab" pkg="jetarm_6dof_rgbd_cam" type="track_and_grab.py" output="screen" respawn="true">
+        	<param name="target_color" value="$(arg target_color)" />
+        </node>
+</launch>

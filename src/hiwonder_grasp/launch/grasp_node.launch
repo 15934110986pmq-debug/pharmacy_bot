@@ -1,0 +1,4 @@
+<launch>
+    <!-- 启动抓取节点(enable grasping node) -->
+    <node name="grasp" pkg="hiwonder_grasp" type="grasp_node.py" required="true" output="screen"/>
+</launch>

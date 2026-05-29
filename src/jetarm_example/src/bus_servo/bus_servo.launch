@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="node_name"       default="bus_servo"/>
+    <!--舵机控制节点-->
+    <include file="$(find jetarm_sdk)/launch/sdk_node_6dof.launch"/>
+    <node pkg="jetarm_example" type="bus_servo.py" name="$(arg node_name)" output="screen">
+    </node>
+</launch>

@@ -1,0 +1,17 @@
+<launch>
+        <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)" />
+
+        <arg name="source_image_topic" default="/rgbd_cam/color/image_rect_color" />
+        <arg name="camera_info_topic" default="/rgbd_cam/color/camera_info" />
+        <!--
+        <include file="$(find hiwonder_transform)/launch/apriltag.launch">
+                <arg name="source_image_topic" value="$(arg source_image_topic)" />
+        </include>
+        -->
+
+        <node name="calibration" pkg="jetarm_6dof_app" type="calibration.py" output="screen" respawn="true">
+                <param name="source_image_topic" value="$(arg source_image_topic)" />
+                <param name="camera_info_topic" value="$(arg camera_info_topic)" />
+                <param name="camera_type" value="$(arg camera_type)" />
+        </node>
+</launch>

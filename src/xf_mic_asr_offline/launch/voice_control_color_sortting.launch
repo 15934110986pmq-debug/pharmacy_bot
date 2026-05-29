@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="robot_name" default="$(env ROBOT_NAME)" />
+    <arg name="robot_dof" default="6" />
+    <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)"/>
+
+    <!-- 根据使用的相机设置相应参数 -->
+    <arg name="source_image_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/camera_info" />
+    <arg name="source_image_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/camera_info" />
+
+
+    <!-- 基础功能 -->
+    <include file="$(find jetarm_bringup)/launch/base.launch">
+        <arg name="robot_dof" value="$(arg robot_dof)" />
+        <arg name="enable_kinematics" value="true"/>
+        <arg name="enable_rosbridge" value="false"/>
+        <arg name="enable_camera" value="true"/>
+        <arg name="enable_web_video" value="true"/>
+        <arg name="enable_lab_config" value="false"/>
+        <arg name="enable_joystick" value="false"/>
+    </include>
+
+    <!-- 颜色分拣 -->
+    <include file="$(find jetarm_6dof_app)/launch/object_sortting.launch">
+    	<arg name="source_image_topic" value="$(arg source_image_topic)" />
+    	<arg name="camera_info_topic" value="$(arg camera_info_topic)" />
+    </include>
+
+    <include file="$(find xf_mic_asr_offline)/launch/mic_init.launch"/>
+
+    <node pkg="xf_mic_asr_offline" type="voice_control_color_sortting.py" name="voice_control_color_sortting_node" output="screen"/>
+</launch>

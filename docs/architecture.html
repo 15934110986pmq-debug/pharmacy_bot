@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI药房机械臂系统架构图</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    .container { max-width: 1300px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem; }
+    .pulse-dot { width: 12px; height: 12px; background: #22d3ee; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle { color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem; }
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5);
+      border-radius: 1rem;
+      border: 1px solid #1e293b;
+      padding: 1.5rem;
+      overflow-x: auto;
+    }
+    svg { width: 100%; min-width: 1050px; display: block; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-top: 2rem; }
+    .card { background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem; border: 1px solid #1e293b; padding: 1.25rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer { text-align: center; margin-top: 1.5rem; color: #475569; font-size: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>PharmacyBot — AI 药房机械臂系统架构</h1>
+      </div>
+      <p class="subtitle">语音识别 → AI症状诊断与药物推荐 → 视觉定位 → ROS运动规划 → 药物分拣 · 补仓告警</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1100 1020">
+        <defs>
+          <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- ============================================================ -->
+        <!-- REGION: Jetson Orin NX (compute boundary)                     -->
+        <!-- ============================================================ -->
+        <rect x="80" y="140" width="940" height="560" rx="14" fill="rgba(251, 191, 36, 0.04)" stroke="#fbbf24" stroke-width="1" stroke-dasharray="8,4"/>
+        <text x="520" y="160" fill="#fbbf24" font-size="11" font-weight="600" text-anchor="middle">Jetson Orin NX (ROS Noetic + Ubuntu 20.04)</text>
+
+        <!-- ============================================================ -->
+        <!-- REGION: Physical Hardware                                      -->
+        <!-- ============================================================ -->
+        <rect x="80" y="740" width="940" height="175" rx="14" fill="rgba(34, 211, 238, 0.03)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="520" y="760" fill="#22d3ee" font-size="11" font-weight="600" text-anchor="middle">物理执行层 — JetArm 六轴机械臂 + STM32 控制器 + 环形麦克风阵列 + 摄像头</text>
+
+        <!-- ============================================================ -->
+        <!-- ARROWS — drawn early so they render behind components         -->
+        <!-- ============================================================ -->
+
+        <!-- User → Voice Input -->
+        <line x1="170" y1="50" x2="230" y2="50" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+        <!-- Voice Input → Xunfei ASR -->
+        <line x1="280" y1="100" x2="280" y2="175" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+        <!-- Xunfei ASR → AI Agent -->
+        <line x1="370" y1="210" x2="435" y2="210" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- Barcode Input → pyzbar decoder -->
+        <line x1="280" y1="140" x2="280" y2="178" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+        <!-- User → Barcode -->
+        <line x1="170" y1="110" x2="230" y2="110" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+        <!-- pyzbar → AI Agent -->
+        <line x1="370" y1="195" x2="435" y2="195" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- AI Agent → Drug KB (bidirectional lookup) -->
+        <line x1="670" y1="225" x2="760" y2="225" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <line x1="760" y1="245" x2="670" y2="245" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+        <text x="720" y="215" fill="#94a3b8" font-size="8" text-anchor="middle">RAG检索</text>
+
+        <!-- Drug KB → Inventory DB -->
+        <line x1="840" y1="280" x2="840" y2="305" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrow-violet)"/>
+
+        <!-- AI Agent → Visual Pipeline (drug ID → verify) -->
+        <path d="M 535 290 L 535 355" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <text x="550" y="328" fill="#94a3b8" font-size="8">药物ID+位置查询</text>
+
+        <!-- Camera → OpenCV -->
+        <line x1="210" y1="400" x2="285" y2="400" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+        <!-- OpenCV → Detection pipeline -->
+        <line x1="435" y1="395" x2="500" y2="395" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- YOLOv8 → Pose -->
+        <line x1="680" y1="402" x2="745" y2="402" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- PaddleOCR → Pose -->
+        <line x1="680" y1="457" x2="745" y2="457" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- pyzbar verify → Pose -->
+        <line x1="680" y1="505" x2="745" y2="505" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- Pose → ROS Core -->
+        <line x1="810" y1="450" x2="810" y2="545" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- ROS Core → OpenCV Pipeline -->
+        <line x1="480" y1="580" x2="480" y2="557" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <line x1="480" y1="605" x2="480" y2="605" stroke="#94a3b8" stroke-width="0.5"/>
+
+        <!-- ROS Core → MoveIt -->
+        <line x1="650" y1="580" x2="650" y2="557" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow)"/>
+        <text x="570" y="560" fill="#94a3b8" font-size="8" text-anchor="middle">目标位姿</text>
+
+        <!-- OpenCV Pipeline → MoveIt -->
+        <line x1="590" y1="600" x2="590" y2="575" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+        <!-- ROS → STM32 -->
+        <line x1="480" y1="645" x2="480" y2="710" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <text x="498" y="680" fill="#94a3b8" font-size="8">串口指令</text>
+
+        <!-- STM32 → Servos -->
+        <line x1="370" y1="765" x2="430" y2="765" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrow-cyan)"/>
+
+        <!-- Servos → JetArm -->
+        <line x1="570" y1="765" x2="625" y2="765" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-rose)"/>
+
+        <!-- JetArm → Sorting -->
+        <line x1="730" y1="800" x2="730" y2="870" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrow-rose)"/>
+
+        <!-- Sorting → Inventory -->
+        <line x1="550" y1="895" x2="550" y2="918" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+        <line x1="730" y1="895" x2="730" y2="918" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
+
+        <!-- Inventory → Alert -->
+        <line x1="660" y1="940" x2="790" y2="940" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)"/>
+        <text x="725" y="935" fill="#fb7185" font-size="8" text-anchor="middle">低于阈值</text>
+
+        <!-- ============================================================ -->
+        <!-- BAND 1: User Interaction Layer (y=20~110)                      -->
+        <!-- ============================================================ -->
+
+        <!-- Background stripe label -->
+        <text x="30" y="55" fill="#475569" font-size="7" transform="rotate(-90,30,55)">用户交互</text>
+
+        <!-- Users - External -->
+        <rect x="70" y="30" width="100" height="70" rx="6" fill="#0f172a" stroke="#94a3b8" stroke-width="1.5"/>
+        <rect x="70" y="30" width="100" height="70" rx="6" fill="rgba(30, 41, 59, 0.5)"/>
+        <text x="120" y="55" fill="white" font-size="11" font-weight="600" text-anchor="middle">患者 / 用户</text>
+        <text x="120" y="72" fill="#94a3b8" font-size="9" text-anchor="middle">语音 · 扫码</text>
+        <text x="120" y="88" fill="#334155" font-size="7" text-anchor="middle">mobile / kiosk</text>
+
+        <!-- Voice Input - Frontend -->
+        <rect x="230" y="30" width="100" height="40" rx="6" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+        <rect x="230" y="30" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)"/>
+        <text x="280" y="54" fill="white" font-size="10" font-weight="600" text-anchor="middle">🎤 语音输入</text>
+
+        <!-- Barcode Input - Frontend -->
+        <rect x="230" y="75" width="100" height="40" rx="6" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+        <rect x="230" y="75" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)"/>
+        <text x="280" y="99" fill="white" font-size="10" font-weight="600" text-anchor="middle">🏷️ 条码扫描</text>
+
+        <!-- Admin Panel - Frontend -->
+        <rect x="870" y="20" width="120" height="80" rx="6" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+        <rect x="870" y="20" width="120" height="80" rx="6" fill="rgba(8, 51, 68, 0.4)"/>
+        <text x="930" y="48" fill="white" font-size="10" font-weight="600" text-anchor="middle">📊 管理后台</text>
+        <text x="930" y="64" fill="#94a3b8" font-size="8" text-anchor="middle">库存看板</text>
+        <text x="930" y="78" fill="#94a3b8" font-size="8" text-anchor="middle">告警推送</text>
+        <text x="930" y="92" fill="#22d3ee" font-size="7" text-anchor="middle">Flutter / Web</text>
+
+        <!-- ============================================================ -->
+        <!-- BAND 2: AI Intelligence Layer (y=180~335)                      -->
+        <!-- ============================================================ -->
+
+        <text x="30" y="230" fill="#475569" font-size="7" transform="rotate(-90,30,230)">AI智能层</text>
+
+        <!-- Xunfei Offline ASR - Backend -->
+        <rect x="170" y="180" width="200" height="60" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="170" y="180" width="200" height="60" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="270" y="203" fill="white" font-size="10" font-weight="600" text-anchor="middle">讯飞离线语音识别</text>
+        <text x="270" y="219" fill="#94a3b8" font-size="9" text-anchor="middle">xf_mic_asr_offline · 中文ASR</text>
+        <text x="270" y="233" fill="#34d399" font-size="7" text-anchor="middle">唤醒词 + 离线识别 + TTS</text>
+
+        <!-- AI Agent - Backend -->
+        <rect x="435" y="180" width="235" height="120" rx="8" fill="#0f172a" stroke="#34d399" stroke-width="2"/>
+        <rect x="435" y="180" width="235" height="120" rx="8" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="552" y="205" fill="white" font-size="11" font-weight="600" text-anchor="middle">🤖 AI 大模型智能体</text>
+        <text x="552" y="224" fill="#94a3b8" font-size="9" text-anchor="middle">Ollama 本地推理引擎</text>
+        <text x="552" y="242" fill="#94a3b8" font-size="9" text-anchor="middle">Qwen2.5 / DeepSeek-Coder</text>
+        <text x="552" y="260" fill="#94a3b8" font-size="9" text-anchor="middle">症状诊断 → 药物推荐</text>
+        <text x="552" y="278" fill="#94a3b8" font-size="9" text-anchor="middle">交互禁忌检测 · 剂量建议</text>
+        <text x="552" y="294" fill="#34d399" font-size="7" text-anchor="middle">RAG 药物知识库检索</text>
+
+        <!-- pyzbar decoder - Backend -->
+        <rect x="170" y="275" width="200" height="42" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="170" y="275" width="200" height="42" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="270" y="294" fill="white" font-size="10" font-weight="600" text-anchor="middle">pyzbar 条码解析</text>
+        <text x="270" y="308" fill="#94a3b8" font-size="9" text-anchor="middle">药物编号提取 → ID查询</text>
+
+        <!-- Drug Knowledge Base - Database -->
+        <rect x="760" y="180" width="160" height="100" rx="6" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+        <rect x="760" y="180" width="160" height="100" rx="6" fill="rgba(76, 29, 149, 0.4)"/>
+        <text x="840" y="203" fill="white" font-size="10" font-weight="600" text-anchor="middle">💊 药物知识库</text>
+        <text x="840" y="221" fill="#94a3b8" font-size="8" text-anchor="middle">• 药品名称 &amp; 通用名</text>
+        <text x="840" y="237" fill="#94a3b8" font-size="8" text-anchor="middle">• 适应症 &amp; 禁忌</text>
+        <text x="840" y="253" fill="#94a3b8" font-size="8" text-anchor="middle">• 用法用量 &amp; 频次</text>
+        <text x="840" y="269" fill="#94a3b8" font-size="8" text-anchor="middle">• 药物交互规则</text>
+
+        <!-- Drug Inventory DB - Database -->
+        <rect x="760" y="305" width="160" height="55" rx="6" fill="#0f172a" stroke="#a78bfa" stroke-width="1.5"/>
+        <rect x="760" y="305" width="160" height="55" rx="6" fill="rgba(76, 29, 149, 0.4)"/>
+        <text x="840" y="326" fill="white" font-size="10" font-weight="600" text-anchor="middle">📦 库存数据库</text>
+        <text x="840" y="344" fill="#94a3b8" font-size="8" text-anchor="middle">货架位置 · 库存数量 · 阈值</text>
+
+        <!-- ============================================================ -->
+        <!-- BAND 3: Visual Pipeline (y=370~535)                           -->
+        <!-- ============================================================ -->
+
+        <text x="30" y="430" fill="#475569" font-size="7" transform="rotate(-90,30,430)">视觉感知管道</text>
+
+        <!-- Camera - Frontend -->
+        <rect x="110" y="380" width="100" height="50" rx="6" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+        <rect x="110" y="380" width="100" height="50" rx="6" fill="rgba(8, 51, 68, 0.4)"/>
+        <text x="160" y="402" fill="white" font-size="10" font-weight="600" text-anchor="middle">📷 摄像头</text>
+        <text x="160" y="418" fill="#94a3b8" font-size="8" text-anchor="middle">单目 / RGB-D</text>
+
+        <!-- OpenCV Preprocess - Backend -->
+        <rect x="285" y="380" width="150" height="50" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="285" y="380" width="150" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="360" y="402" fill="white" font-size="10" font-weight="600" text-anchor="middle">OpenCV 预处理</text>
+        <text x="360" y="418" fill="#94a3b8" font-size="8" text-anchor="middle">畸变校正 · 增强 · ROI</text>
+
+        <!-- YOLOv8 Detection - Backend -->
+        <rect x="500" y="380" width="180" height="45" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="500" y="380" width="180" height="45" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="590" y="400" fill="white" font-size="10" font-weight="600" text-anchor="middle">🔍 YOLOv8 目标检测</text>
+        <text x="590" y="416" fill="#94a3b8" font-size="8" text-anchor="middle">药盒定位 · TensorRT加速</text>
+
+        <!-- PaddleOCR - Backend -->
+        <rect x="500" y="435" width="180" height="45" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="500" y="435" width="180" height="45" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="590" y="455" fill="white" font-size="10" font-weight="600" text-anchor="middle">📝 PaddleOCR 文字</text>
+        <text x="590" y="471" fill="#94a3b8" font-size="8" text-anchor="middle">药品名称 · 批号 · 效期</text>
+
+        <!-- pyzbar Verify - Backend -->
+        <rect x="500" y="490" width="180" height="35" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="500" y="490" width="180" height="35" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="590" y="511" fill="white" font-size="10" font-weight="600" text-anchor="middle">🏷️ pyzbar 条码核验</text>
+
+        <!-- Pose Estimation - Backend -->
+        <rect x="745" y="380" width="150" height="70" rx="8" fill="#0f172a" stroke="#34d399" stroke-width="2"/>
+        <rect x="745" y="380" width="150" height="70" rx="8" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="820" y="403" fill="white" font-size="10" font-weight="600" text-anchor="middle">3D 位姿估计</text>
+        <text x="820" y="421" fill="#94a3b8" font-size="8" text-anchor="middle">坐标转换</text>
+        <text x="820" y="437" fill="#94a3b8" font-size="8" text-anchor="middle">物体 6D 位姿计算</text>
+
+        <!-- ============================================================ -->
+        <!-- BAND 4: ROS Middleware Layer (y=545~655)                      -->
+        <!-- ============================================================ -->
+
+        <text x="30" y="595" fill="#475569" font-size="7" transform="rotate(-90,30,595)">ROS中间层</text>
+
+        <!-- ROS Noetic Core - Cloud -->
+        <rect x="210" y="552" width="175" height="50" rx="6" fill="#0f172a" stroke="#fbbf24" stroke-width="1.5"/>
+        <rect x="210" y="552" width="175" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)"/>
+        <text x="297" y="574" fill="white" font-size="10" font-weight="600" text-anchor="middle">ROS Noetic 核心</text>
+        <text x="297" y="590" fill="#94a3b8" font-size="8" text-anchor="middle">消息总线 · 节点管理</text>
+
+        <!-- OpenCV Pipeline - Cloud -->
+        <rect x="430" y="552" width="160" height="50" rx="6" fill="#0f172a" stroke="#fbbf24" stroke-width="1.5"/>
+        <rect x="430" y="552" width="160" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)"/>
+        <text x="510" y="574" fill="white" font-size="10" font-weight="600" text-anchor="middle">OpenCV 视觉管线</text>
+        <text x="510" y="590" fill="#94a3b8" font-size="8" text-anchor="middle">标定 · 参数 · 发布</text>
+
+        <!-- MoveIt Planning - Cloud -->
+        <rect x="635" y="552" width="185" height="50" rx="6" fill="#0f172a" stroke="#fbbf24" stroke-width="1.5"/>
+        <rect x="635" y="552" width="185" height="50" rx="6" fill="rgba(120, 53, 15, 0.3)"/>
+        <text x="727" y="574" fill="white" font-size="10" font-weight="600" text-anchor="middle">MoveIt 运动规划</text>
+        <text x="727" y="590" fill="#94a3b8" font-size="8" text-anchor="middle">逆运动学 · 轨迹 · 避障</text>
+
+        <!-- ============================================================ -->
+        <!-- BAND 5: Hardware Execution Layer (y=780~890)                  -->
+        <!-- ============================================================ -->
+
+        <text x="30" y="835" fill="#475569" font-size="7" transform="rotate(-90,30,835)">物理执行</text>
+
+        <!-- STM32 Controller - Backend -->
+        <rect x="210" y="790" width="180" height="50" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="210" y="790" width="180" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="300" y="812" fill="white" font-size="10" font-weight="600" text-anchor="middle">STM32 控制板</text>
+        <text x="300" y="828" fill="#94a3b8" font-size="8" text-anchor="middle">舵机驱动 · 串口通信</text>
+
+        <!-- Servos - Frontend -->
+        <rect x="430" y="790" width="140" height="50" rx="6" fill="#0f172a" stroke="#22d3ee" stroke-width="1.5"/>
+        <rect x="430" y="790" width="140" height="50" rx="6" fill="rgba(8, 51, 68, 0.4)"/>
+        <text x="500" y="812" fill="white" font-size="10" font-weight="600" text-anchor="middle">总线舵机 ×6</text>
+        <text x="500" y="828" fill="#94a3b8" font-size="8" text-anchor="middle">高精度关节伺服</text>
+
+        <!-- JetArm - Security/Rose -->
+        <rect x="625" y="780" width="210" height="70" rx="8" fill="#0f172a" stroke="#fb7185" stroke-width="2"/>
+        <rect x="625" y="780" width="210" height="70" rx="8" fill="rgba(136, 19, 55, 0.4)"/>
+        <text x="730" y="805" fill="white" font-size="11" font-weight="600" text-anchor="middle">🦾 JetArm 六轴机械臂</text>
+        <text x="730" y="823" fill="#94a3b8" font-size="9" text-anchor="middle">抓取 · 搬运 · 分拣 · 归位</text>
+        <text x="730" y="841" fill="#fb7185" font-size="7" text-anchor="middle">碰撞检测 · 力控安全</text>
+
+        <!-- ============================================================ -->
+        <!-- BAND 6: Business Logic Layer (y=920~970)                      -->
+        <!-- ============================================================ -->
+
+        <text x="30" y="945" fill="#475569" font-size="7" transform="rotate(-90,30,945)">业务逻辑</text>
+
+        <!-- Drug Sorting - Backend -->
+        <rect x="210" y="920" width="175" height="45" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="210" y="920" width="175" height="45" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="297" y="940" fill="white" font-size="10" font-weight="600" text-anchor="middle">💊 药物分拣</text>
+        <text x="297" y="956" fill="#94a3b8" font-size="8" text-anchor="middle">按类别 · 频次分区</text>
+
+        <!-- Inventory Update - Backend -->
+        <rect x="430" y="920" width="165" height="45" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
+        <rect x="430" y="920" width="165" height="45" rx="6" fill="rgba(6, 78, 59, 0.4)"/>
+        <text x="512" y="940" fill="white" font-size="10" font-weight="600" text-anchor="middle">📋 库存更新</text>
+        <text x="512" y="956" fill="#94a3b8" font-size="8" text-anchor="middle">自动扣减 · 操作日志</text>
+
+        <!-- Replenishment Alert - Security -->
+        <rect x="635" y="920" width="185" height="45" rx="6" fill="#0f172a" stroke="#fb7185" stroke-width="2"/>
+        <rect x="635" y="920" width="185" height="45" rx="6" fill="rgba(136, 19, 55, 0.4)"/>
+        <text x="727" y="940" fill="white" font-size="10" font-weight="600" text-anchor="middle">🚨 补仓告警</text>
+        <text x="727" y="956" fill="#94a3b8" font-size="8" text-anchor="middle">低库存 → QQ/短信推送</text>
+
+        <!-- ============================================================ -->
+        <!-- LEGEND                                                       -->
+        <!-- ============================================================ -->
+        <rect x="855" y="575" width="165" height="195" rx="8" fill="rgba(15, 23, 42, 0.8)" stroke="#1e293b" stroke-width="1"/>
+        <text x="937" y="595" fill="white" font-size="10" font-weight="600" text-anchor="middle">图例 Legend</text>
+
+        <rect x="867" y="607" width="16" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="889" y="615" fill="#94a3b8" font-size="8">用户界面/交互</text>
+
+        <rect x="867" y="625" width="16" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="889" y="633" fill="#94a3b8" font-size="8">AI / 处理服务</text>
+
+        <rect x="867" y="643" width="16" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="889" y="651" fill="#94a3b8" font-size="8">数据库 / 知识库</text>
+
+        <rect x="867" y="661" width="16" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="889" y="669" fill="#94a3b8" font-size="8">ROS 中间件 / 基础</text>
+
+        <rect x="867" y="679" width="16" height="10" rx="2" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="889" y="687" fill="#94a3b8" font-size="8">物理执行 / 安全</text>
+
+        <rect x="867" y="697" width="16" height="10" rx="2" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1"/>
+        <text x="889" y="705" fill="#94a3b8" font-size="8">外部实体 / 用户</text>
+
+        <line x1="867" y1="722" x2="883" y2="722" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="4,3"/>
+        <text x="889" y="726" fill="#94a3b8" font-size="8">告警 / 事件流</text>
+
+        <rect x="867" y="735" width="16" height="10" rx="2" fill="transparent" stroke="#fbbf24" stroke-width="0.8" stroke-dasharray="5,3"/>
+        <text x="889" y="743" fill="#94a3b8" font-size="8">Jetson计算边界</text>
+
+        <rect x="867" y="751" width="16" height="10" rx="2" fill="transparent" stroke="#22d3ee" stroke-width="0.8" stroke-dasharray="4,2"/>
+        <text x="889" y="759" fill="#94a3b8" font-size="8">物理硬件边界</text>
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>🤖 AI 智能体引擎</h3>
+        </div>
+        <ul>
+          <li>• Ollama 本地推理，Qwen2.5 / DeepSeek-Coder 双模型</li>
+          <li>• RAG 增强检索：药物知识库实时查询，症状→药物精准映射</li>
+          <li>• 多轮对话：追问症状细节，交互禁忌自动检测</li>
+          <li>• 输出结构化药物推荐（药品名、剂量、频次、注意事项）</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>📷 视觉识别管道</h3>
+        </div>
+        <ul>
+          <li>• YOLOv8 目标检测 → 药盒定位（TensorRT 推理加速）</li>
+          <li>• PaddleOCR → 药品名称、批号、有效期文字提取</li>
+          <li>• pyzbar → 条形码/EAN码解码，药物身份核验</li>
+          <li>• OpenCV 管线 → 畸变校正、位姿估计、坐标变换</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>🦾 运动规划与执行</h3>
+        </div>
+        <ul>
+          <li>• MoveIt 逆运动学求解 → 六轴关节轨迹生成</li>
+          <li>• STM32 控制板 → 总线舵机实时伺服驱动</li>
+          <li>• JetArm 六轴机械臂 → 高精度抓取与分拣</li>
+          <li>• 碰撞检测 + 力控安全 → 人机协作保护</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">
+      PharmacyBot · AI 药房机械臂系统 · Jetson Orin NX + ROS Noetic + MoveIt + YOLOv8 + PaddleOCR · 2025
+    </p>
+  </div>
+</body>
+</html>

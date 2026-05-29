@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<!--颜色识别-->
+<launch>
+    <!-- 设置节点名 -->
+    <arg name="node_name"       default="color_detection"/>
+    <!-- 选择对应的相机类型 -->
+    <arg name="camera_type" default="$(optenv CAMERA_TYPE GEMINI)"/>
+    <!-- 根据使用的相机设置相应参数 -->
+    <arg name="source_image_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='GEMINI')" default="/rgbd_cam/color/camera_info" />
+    <arg name="source_image_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/image_rect_color" />
+    <arg name="camera_info_topic" if="$(eval camera_type=='USB_CAM')" default="/usb_cam/camera_info" />
+    <!--摄像头节点-->
+    <include file="$(find jetarm_peripherals)/launch/camera.launch"/>
+    <node pkg="jetarm_example" type="color_space.py" name="$(arg node_name)" output="screen">
+        <param name="source_image_topic" value="$(arg source_image_topic)" />
+        <param name="camera_info_topic" value="$(arg camera_info_topic)" />
+    </node>
+</launch>

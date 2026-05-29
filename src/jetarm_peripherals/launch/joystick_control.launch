@@ -1,0 +1,4 @@
+<launch>
+        <node name="joystick_control" pkg="jetarm_peripherals" type="joystick_control.py" output="screen" respawn="true">
+        </node>
+</launch>

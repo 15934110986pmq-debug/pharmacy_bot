@@ -1,0 +1,2 @@
+bool complete
+hiwonder_interfaces/EulerAngles grasp_posture

@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+    <arg name="node_name"       default="path_planning"/>
+    <!--舵机控制节点-->
+    <include file="$(find jetarm_bringup)/launch/base.launch"/>
+    <node pkg="jetarm_example" type="path_planning.py" name="$(arg node_name)" output="screen">
+    </node>
+</launch>

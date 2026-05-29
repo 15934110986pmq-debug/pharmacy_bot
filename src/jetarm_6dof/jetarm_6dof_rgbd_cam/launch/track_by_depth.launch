@@ -1,0 +1,14 @@
+<launch>
+        <arg name="target_color" default="blue" />
+        <arg name="enable_disp" default="true" />
+        <include file="$(find jetarm_bringup)/launch/base.launch"/>
+ 
+ 	<node name="target_pose_to_tf" pkg="jetarm_bringup" type="pose_to_tf.py" output="screen" respawn="true" >
+		<param name="parent_link" value="base_link" />
+	</node>
+
+        <node name="track_by_depth" pkg="jetarm_6dof_rgbd_cam" type="track_by_depth.py" output="screen" respawn="true">
+        	<param name="target_color" value="$(arg target_color)" />
+		<param name="enable_disp" value="$(arg enable_disp)" />
+        </node>
+</launch>

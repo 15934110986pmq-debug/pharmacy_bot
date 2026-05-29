@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!--透视变换(Perspective transformation)-->
+<launch>
+    <arg name="node_name"   default="perspective_transformation"/>
+    <arg name="debug"       default="false"/>
+    <arg name="source_image_topic" default="/rgbd_cam/color/image_rect_color" />
+
+    <node pkg="color_detection" type="perspective_transformation_node.py" name="$(arg node_name)" output="screen">
+        <!--直接开启并且显示画面(start directly and display image)-->
+        <param name="debug" value="$(arg debug)" />
+
+        <param name="source_image_topic" value="$(arg source_image_topic)" />
+    </node>
+</launch>
