@@ -2,6 +2,7 @@
 # coding: utf8
 
 import os
+import sys
 import math
 import cv2
 import rospy
@@ -12,6 +13,7 @@ from vision_utils import xyz_quat_to_mat, xyz_euler_to_mat, xyz_rot_to_mat, mat_
 from sensor_msgs.msg import Image as RosImage, CameraInfo
 from std_srvs.srv import Trigger, TriggerRequest, TriggerResponse
 from std_srvs.srv import SetBool, SetBoolRequest, SetBoolResponse
+from std_srvs.srv import SetString as SetStringSrv, SetStringResponse as SetStringSrvResponse
 from hiwonder_interfaces.srv import SetStringBool, SetStringBoolRequest, SetStringBoolResponse, GetRobotPose
 from hiwonder_interfaces.msg import Grasp, MoveAction, MoveGoal, MultiRawIdPosDur
 from utils import unregister
@@ -21,6 +23,24 @@ from dt_apriltags import Detector
 import actionlib
 import heart
 from actionlib_msgs.msg import GoalID
+
+# ── ocr_barcode 集成 ──────────────────────────────────────────
+_OCR_BARCODE_AVAILABLE = False
+_drug_detector = None
+try:
+    _ocr_barcode_dir = os.path.join(os.path.dirname(__file__), '..', '..', '..', '..', '..', 'ocr_barcode')
+    if _ocr_barcode_dir not in sys.path:
+        sys.path.insert(0, os.path.abspath(_ocr_barcode_dir))
+    from ocr_barcode.drug_detector import detect_drug
+    _OCR_BARCODE_AVAILABLE = True
+except ImportError as e:
+    rospy.logwarn("ocr_barcode module not available (%s); falling back to color-only detection", str(e))
+
+DETECTION_MODE_AUTO = 'auto'
+DETECTION_MODE_BARCODE = 'barcode_only'
+DETECTION_MODE_OCR = 'ocr_only'
+DETECTION_MODE_COLOR = 'color_only'
+DETECTION_MODE_ALL = 'all'
 
 
 TARGET_POSITION = {
@@ -82,6 +102,11 @@ class ObjectSorttingNode():
             "tag_3": False,
         }
 
+        # ── 检测模式 ──
+        self.detection_mode = DETECTION_MODE_AUTO
+        self._drug_result_stable = None
+        self._drug_stable_count = 0
+
         self.at_detector = Detector(searchpath=['apriltags'],
                        families='tag36h11',
                        nthreads=4,
@@ -107,6 +132,8 @@ class ObjectSorttingNode():
         self.set_running_srv = rospy.Service('~enable_sortting', SetBool, self.enable_sortting_srv_callback)
         self.set_target_srv = rospy.Service('~set_color_target', SetStringBool, self.set_color_target_srv_callback)
         self.set_target_srv = rospy.Service('~set_tag_target', SetStringBool, self.set_tag_target_srv_callback)
+        self.set_detection_mode_srv = rospy.Service('~set_detection_mode', SetStringSrv, self.set_detection_mode_callback)
+        self.get_detection_mode_srv = rospy.Service('~get_detection_mode', Trigger, self.get_detection_mode_callback)
         self.heart = heart.Heart('~heartbeat', 5, lambda e: self.exit_srv_callback(e))
 
     def go_home(self):
@@ -237,6 +264,25 @@ class ObjectSorttingNode():
         if "tag_" + req.data_str in self.target_labels:
             self.target_labels['tag_' + req.data_str] = req.data_bool
         return SetStringBoolResponse(success=True, message="")
+
+    # ── 检测模式切换 ──────────────────────────────────────
+    def set_detection_mode_callback(self, req):
+        mode = req.data
+        valid_modes = [
+            DETECTION_MODE_AUTO, DETECTION_MODE_BARCODE,
+            DETECTION_MODE_OCR, DETECTION_MODE_COLOR, DETECTION_MODE_ALL
+        ]
+        if mode not in valid_modes:
+            rospy.logwarn("Invalid detection mode: %s (valid: %s)", mode, valid_modes)
+            return SetStringSrvResponse(success=False, message=f"Invalid mode: {mode}")
+        self.detection_mode = mode
+        self._drug_result_stable = None
+        self._drug_stable_count = 0
+        rospy.loginfo("Detection mode set to: %s", mode)
+        return SetStringSrvResponse(success=True, message=f"mode={mode}")
+
+    def get_detection_mode_callback(self, req):
+        return TriggerResponse(success=True, message=self.detection_mode)
 
     def point_remapped(self, point, now, new, data_type=float):
         """
@@ -417,30 +463,64 @@ class ObjectSorttingNode():
             #cv2.imshow("roi", cv2.cvtColor(roi_img, cv2.COLOR_RGB2BGR))
             #cv2.waitKey(1)
             #result_image[0:int(roi_img.shape[0]), 0:int(roi_img.shape[1])] = roi_img
-            image_lab = cv2.cvtColor(roi_img, cv2.COLOR_RGB2LAB) # 转换到 LAB 空间(convert to LAB space)
-            self.color_ranges = rospy.get_param('/config/lab', self.color_ranges)
-            img_h, img_w = rgb_image.shape[:2]
-            for color_name in ['red', 'green', 'blue']:
-                color = self.color_ranges[color_name]
-                mask = cv2.inRange(image_lab, tuple(color['min']), tuple(color['max']))   # 二值化(binarization)
-                # 平滑边缘，去除小块，合并靠近的块(Smooth edges, remove small blocks, and merge adjacent blocks)
-                eroded = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
-                dilated = cv2.dilate(eroded, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
-                contours = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2]  # 找出所有轮廓(find all contours)
-                contours_area = map(lambda c: (math.fabs(cv2.contourArea(c)), c), contours)  # 计算轮廓面积(calculate contour area)
-                contours = map(lambda a_c: a_c[1], filter(lambda a: self.min_area <= a[0] <= self.max_area, contours_area))
-                for c in contours:
-                    # cv2.drawContours(result_image, c, -1, (255, 255, 0), 2, cv2.LINE_AA) # 绘制轮廓(draw contour)
-                    rect = cv2.minAreaRect(c)  # 获取最小外接矩形(obtain the minimum bounding rectangle)
-                    (center_x, center_y), _ = cv2.minEnclosingCircle(c)
-                    center_x, center_y = self.roi[2] + center_x, self.roi[0] + center_y
-                    #center_x, center_y = self.roi[2] + rect[0][0], self.roi[0] + rect[0][1] 
-                    cv2.circle(result_image, (int(center_x), int(center_y)), 8, (0, 0, 0), -1)
-                    corners = list(map(lambda p: (self.roi[2] + p[0], self.roi[0] + p[1]), cv2.boxPoints(rect))) # 获取最小外接矩形的四个角点, 转换回原始图的坐标(obtain the four corner points of the minimum rectangle and convert to the coordinates of the original image)
-                    cv2.drawContours(result_image, [np.intp(corners)], -1, (0, 255, 255), 2, cv2.LINE_AA)  # 绘制矩形轮廓(draw rectangle contour)
-                    index += 1 # 序号递增(incremental numbering)
-                    angle = int(round(rect[2]))  # 矩形角度(rectangle angle)
-                    target_list.append([color_name, index, (center_x, center_y), angle])
+
+            # ── ocr_barcode 融合检测（在颜色检测之前）────
+            drug_target = None
+            if _OCR_BARCODE_AVAILABLE and self.enable_sortting:
+                should_detect = True
+                if self.detection_mode == DETECTION_MODE_COLOR:
+                    should_detect = False
+                if should_detect:
+                    try:
+                        drug_result = detect_drug(rgb_image, stability_frames=3, use_color_fallback=False, reset=False)
+                        if drug_result and drug_result.get('method') in ('barcode', 'ocr'):
+                            method = drug_result['method']
+                            drug_name = drug_result.get('drug_name', '')
+                            confidence = drug_result.get('confidence', 0)
+                            # 画框标注
+                            cv2.putText(result_image, f"{method}:{drug_name} ({confidence})",
+                                        (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                            # 用于触发分拣
+                            drug_target = {
+                                'method': method,
+                                'drug_name': drug_name,
+                                'drug_id': drug_result.get('drug_id', ''),
+                            }
+                    except Exception as e:
+                        rospy.logwarn_throttle(5.0, "ocr_barcode detect error: %s", str(e))
+
+            # ── 同时做颜色检测（若模式允许）───────────────
+            do_color = (self.detection_mode in (DETECTION_MODE_AUTO, DETECTION_MODE_ALL, DETECTION_MODE_COLOR)
+                        or drug_target is None)
+
+            if do_color:
+                rospy.logdebug("Running color detection (mode=%s)", self.detection_mode)
+                image_lab = cv2.cvtColor(roi_img, cv2.COLOR_RGB2LAB) # 转换到 LAB 空间(convert to LAB space)
+                self.color_ranges = rospy.get_param('/config/lab', self.color_ranges)
+                img_h, img_w = rgb_image.shape[:2]
+                for color_name in ['red', 'green', 'blue']:
+                    color = self.color_ranges[color_name]
+                    mask = cv2.inRange(image_lab, tuple(color['min']), tuple(color['max']))   # 二值化(binarization)
+                    # 平滑边缘，去除小块，合并靠近的块(Smooth edges, remove small blocks, and merge adjacent blocks)
+                    eroded = cv2.erode(mask, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+                    dilated = cv2.dilate(eroded, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+                    contours = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[-2]  # 找出所有轮廓(find all contours)
+                    contours_area = map(lambda c: (math.fabs(cv2.contourArea(c)), c), contours)  # 计算轮廓面积(calculate contour area)
+                    contours = map(lambda a_c: a_c[1], filter(lambda a: self.min_area <= a[0] <= self.max_area, contours_area))
+                    for c in contours:
+                        # cv2.drawContours(result_image, c, -1, (255, 255, 0), 2, cv2.LINE_AA) # 绘制轮廓(draw contour)
+                        rect = cv2.minAreaRect(c)  # 获取最小外接矩形(obtain the minimum bounding rectangle)
+                        (center_x, center_y), _ = cv2.minEnclosingCircle(c)
+                        center_x, center_y = self.roi[2] + center_x, self.roi[0] + center_y
+                        #center_x, center_y = self.roi[2] + rect[0][0], self.roi[0] + rect[0][1] 
+                        cv2.circle(result_image, (int(center_x), int(center_y)), 8, (0, 0, 0), -1)
+                        corners = list(map(lambda p: (self.roi[2] + p[0], self.roi[0] + p[1]), cv2.boxPoints(rect))) # 获取最小外接矩形的四个角点, 转换回原始图的坐标(obtain the four corner points of the minimum rectangle and convert to the coordinates of the original image)
+                        cv2.drawContours(result_image, [np.intp(corners)], -1, (0, 255, 255), 2, cv2.LINE_AA)  # 绘制矩形轮廓(draw rectangle contour)
+                        index += 1 # 序号递增(incremental numbering)
+                        angle = int(round(rect[2]))  # 矩形角度(rectangle angle)
+                        target_list.append([color_name, index, (center_x, center_y), angle])
+            else:
+                rospy.logdebug("Skipping color detection (mode=%s, drug_target=%s)", self.detection_mode, drug_target)
 
             tags = self.at_detector.detect(cv2.cvtColor(rgb_image, cv2.COLOR_RGB2GRAY), True, (self.K[0,0], self.K[1,1], self.K[0,2], self.K[1,2]), self.tag_size)
             if len(tags) > 0:

@@ -45,7 +45,7 @@ pharmacy_bot/
 │   ├── xf_mic_asr_offline/  # 讯飞离线语音识别SDK
 │   └── dataset_capture/     # 数据集采集工具(Qt GUI)
 ├── ai_agent/                # AI大模型智能体 (待开发)
-├── ocr_barcode/             # 视觉识别模块 (待开发)
+├── ocr_barcode/             # ✅ 视觉识别模块 (条码+OCR+颜色)
 ├── models/                  # 模型权重
 ├── scripts/                 # 部署脚本
 └── README.md
