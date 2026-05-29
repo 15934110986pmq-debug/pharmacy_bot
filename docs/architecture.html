@@ -172,9 +172,8 @@
         <line x1="550" y1="895" x2="550" y2="918" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
         <line x1="730" y1="895" x2="730" y2="918" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrow-emerald)"/>
 
-        <!-- Inventory → Alert -->
-        <line x1="660" y1="940" x2="790" y2="940" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)"/>
-        <text x="725" y="935" fill="#fb7185" font-size="8" text-anchor="middle">低于阈值</text>
+        <!-- Inventory → Future Alert (dashed → future) -->
+        <line x1="660" y1="940" x2="738" y2="940" stroke="#475569" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrow)"/>
 
         <!-- ============================================================ -->
         <!-- BAND 1: User Interaction Layer (y=20~110)                      -->
@@ -347,7 +346,7 @@
         <!-- BAND 6: Business Logic Layer (y=920~970)                      -->
         <!-- ============================================================ -->
 
-        <text x="30" y="945" fill="#475569" font-size="7" transform="rotate(-90,30,945)">业务逻辑</text>
+        <text x="30" y="945" fill="#475569" font-size="7" transform="rotate(-90,30,945)">业务逻辑(当前+未来)</text>
 
         <!-- Drug Sorting - Backend -->
         <rect x="210" y="920" width="175" height="45" rx="6" fill="#0f172a" stroke="#34d399" stroke-width="1.5"/>
@@ -361,11 +360,11 @@
         <text x="512" y="940" fill="white" font-size="10" font-weight="600" text-anchor="middle">📋 库存更新</text>
         <text x="512" y="956" fill="#94a3b8" font-size="8" text-anchor="middle">自动扣减 · 操作日志</text>
 
-        <!-- Replenishment Alert - Security -->
-        <rect x="635" y="920" width="185" height="45" rx="6" fill="#0f172a" stroke="#fb7185" stroke-width="2"/>
-        <rect x="635" y="920" width="185" height="45" rx="6" fill="rgba(136, 19, 55, 0.4)"/>
-        <text x="727" y="940" fill="white" font-size="10" font-weight="600" text-anchor="middle">🚨 补仓告警</text>
-        <text x="727" y="956" fill="#94a3b8" font-size="8" text-anchor="middle">低库存 → QQ/短信推送</text>
+        <!-- Replenishment Alert - Future -->
+        <rect x="635" y="920" width="185" height="45" rx="6" fill="#0f172a" stroke="#475569" stroke-width="1" stroke-dasharray="5,3"/>
+        <rect x="635" y="920" width="185" height="45" rx="6" fill="rgba(30, 41, 59, 0.3)"/>
+        <text x="727" y="940" fill="#94a3b8" font-size="10" font-weight="600" text-anchor="middle">🔮 未来: 补仓告警</text>
+        <text x="727" y="956" fill="#475569" font-size="8" text-anchor="middle">需接入AMR移动底盘</text>
 
         <!-- ============================================================ -->
         <!-- LEGEND                                                       -->
@@ -410,7 +409,7 @@
           <h3>🤖 AI 智能体引擎</h3>
         </div>
         <ul>
-          <li>• Ollama 本地推理，Qwen2.5 / DeepSeek-Coder 双模型</li>
+          <li>• 云端 LLM API（DeepSeek / Qwen），OpenAI SDK 兼容</li>
           <li>• RAG 增强检索：药物知识库实时查询，症状→药物精准映射</li>
           <li>• 多轮对话：追问症状细节，交互禁忌自动检测</li>
           <li>• 输出结构化药物推荐（药品名、剂量、频次、注意事项）</li>

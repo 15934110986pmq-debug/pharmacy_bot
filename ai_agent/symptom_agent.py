@@ -82,6 +82,9 @@ class SymptomAgent:
         """
         self.ensure_loaded()
 
+        # 0. 隐私脱敏
+        symptom_text = self._sanitize_input(symptom_text)
+
         # 1. RAG检索: 症状 → Top-5 匹配药物
         candidates = self.kb.retrieve(symptom_text, k=5)
         logger.info(f"RAG retrieved {len(candidates)} candidate drugs")
@@ -139,6 +142,17 @@ class SymptomAgent:
         result = self._check_interactions(result)
 
         return result
+
+    def _sanitize_input(self, text: str) -> str:
+        """隐私脱敏: 移除可能的PII信息后再发送到云端API"""
+        import re
+        # 移除电话号码
+        text = re.sub(r'1[3-9]\d{9}', '[电话已隐藏]', text)
+        # 移除身份证号
+        text = re.sub(r'\d{17}[\dXx]', '[证件号已隐藏]', text)
+        # 移除邮箱
+        text = re.sub(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', '[邮箱已隐藏]', text)
+        return text
 
     def _check_interactions(self, result: dict) -> dict:
         """检测推荐药物之间的交互禁忌"""

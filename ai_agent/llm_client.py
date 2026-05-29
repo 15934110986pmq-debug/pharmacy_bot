@@ -92,6 +92,8 @@ class LLMClient:
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
 
+        content = None  # 防止 JSON 解析失败时 UnboundLocalError
+
         for attempt in range(self.max_retries):
             try:
                 start = time.monotonic()

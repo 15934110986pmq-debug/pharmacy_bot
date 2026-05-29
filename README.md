@@ -67,18 +67,21 @@ pharmacy_bot/
 ## 快速开始
 
 ```bash
-# 环境
-sudo apt install ros-noetic-desktop-full ros-noetic-moveit
-pip install ollama paddleocr pyzbar llama-index chromadb
-
-# 编译 ROS 工作空间
+# 编译 ROS 工作空间 (在 src/ 目录下执行)
 cd src && catkin_make
 
 # 启动机械臂
+source devel/setup.bash
 roslaunch jetarm_bringup bringup.launch
 
-# 启动 AI Agent
-cd ../ai_agent && python symptom_agent.py
+# 使用 AI Agent
+cd ../ai_agent
+export DEEPSEEK_API_KEY="your-key-here"
+python -c "
+from symptom_agent import SymptomAgent
+agent = SymptomAgent()
+print(agent.diagnose('头痛发烧两天'))
+"
 ```
 
 ## 资料引用

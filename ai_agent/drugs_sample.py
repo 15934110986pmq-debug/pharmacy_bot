@@ -1,6 +1,8 @@
-"""
-药物知识库示例数据 (drugs.json)
-"""
+# ⚠️ 免责声明 / DISCLAIMER
+# 本文件中的药物数据仅供技术演示和原型验证，不用于实际诊断。
+# 药物信息来源于国家药品监督管理局(NMPA)公开数据库及药品说明书，
+# 可能不完整或已过时。实际系统必须接入NMPA官方数据库。
+# 详见: docs/DISCLAIMER.md
 import json
 
 SAMPLE_DRUGS = [
