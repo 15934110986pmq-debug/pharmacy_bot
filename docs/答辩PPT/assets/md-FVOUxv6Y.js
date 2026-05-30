@@ -1,0 +1,19 @@
+import{L as e,T as t,Y as n,_ as r,b as i,g as a,gt as o,mt as s,x as c}from"./modules/shiki-BTitm6Yo.js";import{nt as l,rt as u}from"./index-AC2flFN5.js";import{t as d}from"./slidev/default-Bc_zM1C0.js";import{t as f}from"./slidev/CodeBlockWrapper-CmC5pjDB.js";import{t as p}from"./slidev/Mermaid-DzoK0Hrx.js";var m={class:`grid grid-cols-2 gap-4`},h={class:`bg-orange-50 p-4 rounded-lg`},g={__name:`pharmacy_bot_答辩PPT.md__slidev_15`,setup(g){let{$slidev:_,$nav:v,$clicksContext:y,$clicks:b,$page:x,$renderContext:S,$frontmatter:C}=u();return y.setup(),(u,g)=>{let _=p,v=f;return e(),r(d,o(t(s(l)(s(C),14))),{default:n(()=>[g[7]||=a(`h1`,null,`11 / 机械臂执行系统 (ROS MoveIt)`,-1),a(`div`,m,[a(`div`,null,[g[0]||=a(`h3`,null,`🤖 抓取执行流程`,-1),c(_,{"code-lz":`GYGw9g7gxgFghgJwC4AIAqARAUC3KCCA2gESBjkYJORAzBoLLyg/5rEC6KAtCwHwoBCJAsmADcApgElUgMATAx5EAeAEYIA9OxEBpFAGUwIYQiY48XVhxQBhEoAt4wJ/xgEcjASEpzF7E4iRCAzgEs4AOxQAFOCQYPTxTI04MEnU0XkoAJgclQFYgwC5zQHLjQDYlELwMcJQAURJALE1ANjTAVutAZKNANeVE9kBS40BF+MAkwmqmwAAEwH8EpiA`}),g[1]||=a(`h3`,null,`📁 ROS包 (搬运改造)`,-1),g[2]||=a(`table`,null,[a(`thead`,null,[a(`tr`,null,[a(`th`,null,`包名`),a(`th`,null,`功能`)])]),a(`tbody`,null,[a(`tr`,null,[a(`td`,null,[a(`code`,null,`hiwonder_grasp`)]),a(`td`,null,`三阶段抓取轨迹`)]),a(`tr`,null,[a(`td`,null,[a(`code`,null,`jetarm_6dof`)]),a(`td`,null,`机械臂控制+颜色分拣`)]),a(`tr`,null,[a(`td`,null,[a(`code`,null,`jetarm_kinematics`)]),a(`td`,null,`正逆运动学`)]),a(`tr`,null,[a(`td`,null,[a(`code`,null,`hiwonder_interfaces`)]),a(`td`,null,`自定义ROS消息`)]),a(`tr`,null,[a(`td`,null,[i(`✅ `),a(`code`,null,`object_sortting.py`)]),a(`td`,null,`已改造集成检测`)])])],-1)]),a(`div`,h,[g[4]||=a(`h3`,null,`🔧 抓取三阶段策略`,-1),c(v,{title:``,ranges:[]},{default:n(()=>[...g[3]||=[a(`pre`,{class:`shiki shiki-themes vitesse-dark vitesse-light slidev-code`,style:{"--shiki-dark":`#dbd7caee`,"--shiki-light":`#393a34`,"--shiki-dark-bg":`#121212`,"--shiki-light-bg":`#ffffff`}},[a(`code`,{class:`language-text`},[a(`span`,{class:`line`},[a(`span`,null,`Stage 1: 接近`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 末端移动到药盒上方 ~50mm`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 使用Cartesian路径保持姿态`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`Stage 2: 抓取`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 夹爪张开至药盒宽度`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 下降至抓取位姿`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 闭合夹爪 (力矩反馈)`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`Stage 3: 退避`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 垂直提升 ~100mm`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 移动到交付窗口位姿`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 释放夹爪`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  └─ 归位 (home position)`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`异常处理:`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  ⚠ 滑脱 → 重试 3次`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  ⚠ 通信超时 → 紧急停止`)]),i(`
+`),a(`span`,{class:`line`},[a(`span`,null,`  ⚠ 碰撞检测 → 轨迹重新规划`)])])],-1)]]),_:1}),g[5]||=a(`h3`,null,`⚡ 性能指标`,-1),g[6]||=a(`table`,null,[a(`thead`,null,[a(`tr`,null,[a(`th`,null,`指标`),a(`th`,null,`值`)])]),a(`tbody`,null,[a(`tr`,null,[a(`td`,null,`自由度`),a(`td`,null,`6-DOF`)]),a(`tr`,null,[a(`td`,null,`工作半径`),a(`td`,null,`~350mm`)]),a(`tr`,null,[a(`td`,null,`重复精度`),a(`td`,null,`±1mm`)]),a(`tr`,null,[a(`td`,null,`抓取周期`),a(`td`,null,`<10s`)]),a(`tr`,null,[a(`td`,null,`有效负载`),a(`td`,null,`≥200g`)])])],-1)])])]),_:1},16)}}};export{g as default};

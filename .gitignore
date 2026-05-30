@@ -23,6 +23,10 @@ logs/
 *.part*.rar
 *.exe
 
+# Slidev / Node
+slidev/node_modules/
+slidev/dist/
+
 # IDE
 .idea/
 .vscode/
